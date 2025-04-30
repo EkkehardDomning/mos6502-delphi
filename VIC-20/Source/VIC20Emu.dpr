@@ -1,7 +1,11 @@
 program VIC20Emu;
 
 uses
-  Vcl.Forms,
+  {$IFnDEF FPC}
+    Vcl.Forms,
+  {$ELSE}
+    Forms, Interfaces,
+  {$ENDIF}
   FormV20 in 'FormV20.pas' {FrmVC20},
   VIC20 in 'VIC20.pas',
   MOS6502 in '..\..\Source\MOS6502.pas';

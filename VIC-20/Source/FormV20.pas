@@ -1,10 +1,18 @@
 unit FormV20;
 
+{$IFDEF FPC}
+  {$MODE Delphi}
+{$ENDIF}
+
 interface
 
 uses
-  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
-  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, VIC20, Vcl.StdCtrls, Vcl.ExtCtrls;
+{$IFnDEF FPC}
+  Vcl.Forms, Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics, Vcl.Controls, Vcl.Dialogs, Vcl.StdCtrls, Vcl.ExtCtrls,
+{$ELSE}
+  Forms, Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Dialogs, StdCtrls, ExtCtrls,
+{$ENDIF}
+  VIC20;
 
 const
   ScreenZoom = 2;
@@ -14,6 +22,9 @@ const
   ColorTable: array [0 .. 2] of Cardinal = ($801010, $D0A0A0, $D0A0A0);
 
 type
+
+  { TFrmVC20 }
+
   TFrmVC20 = class(TForm)
     procedure FormCreate(Sender: TObject);
     procedure FormKeyUp(Sender: TObject; var Key: Word; Shift: TShiftState);
@@ -33,9 +44,15 @@ var
 
 implementation
 
-{$R *.dfm}
+{$IFnDEF FPC}
+  {$R *.dfm}
+{$ELSE}
+  {$R *.lfm}
+{$ENDIF}
 
 procedure TFrmVC20.FormCreate(Sender: TObject);
+var
+  fp : String;
 begin
   ClientWidth := ScreenWidth;
   ClientHeight := ScreenHeight;
@@ -46,8 +63,14 @@ begin
 
   VC20 := TVC20.Create;
   VC20.WndHandle := Handle;
-  VC20.LoadROM('..\ROMs\kernal.901486-06.bin', $E000); // E000-FFFF
-  VC20.LoadROM('..\ROMs\basic.901486-01.bin', $C000); // C000-DFFF
+  fp := IncludeTrailingPathDelimiter(ExtractFilePath(Application.ExeName));
+  {$IFDEF FPC}
+  fp := fp + '..\..\';
+  {$ENDIF}
+
+  VC20.LoadROM(fp+'..\ROMs\kernal.901486-07.bin', $E000); // E000-FFFF
+  VC20.LoadROM(fp+'..\ROMs\basic.901486-01.bin', $C000); // C000-DFFF
+  VC20.LoadROM(fp+'..\ROMs\characters.901460-03.bin', $8000); // 8000-8FFF
   VC20.Exec;
 end;
 
@@ -77,6 +100,8 @@ var
   Flag: Cardinal;
   Q1: Byte;
   Sc: Char;
+  PxX, PxY, ChrWH : Integer;
+  sz : TSize;
 begin
   Addr := Msg.WParam;
   Value := Msg.LParam;
@@ -90,7 +115,16 @@ begin
 
   Canvas.Font.Color := ColorTable[1 - Flag];
   Canvas.Brush.Color := ColorTable[Flag];
-  Canvas.TextOut(X * (8*ScreenZoom), Y * (8*ScreenZoom), Sc);
+  Canvas.Pen.Style := psClear;
+  PxX := X * (8*ScreenZoom);
+  PxY := Y * (8*ScreenZoom);
+  ChrWH := 8*ScreenZoom;
+  Canvas.Rectangle(PxX,PxY,PxX+ChrWH+1,PxY+ChrWH+1);
+  if (Sc <> #0) and (Sc <> ' ') then
+  begin
+    sz := Canvas.TextExtent(Sc);
+    Canvas.TextOut(PxX+(ChrWH-sz.cx) div 2, PxY, Sc);
+  end;
 end;
 
 end.
