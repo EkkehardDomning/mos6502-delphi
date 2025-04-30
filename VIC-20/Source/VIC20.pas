@@ -1,9 +1,18 @@
 unit VIC20;
 
+{$IFDEF FPC}
+  {$MODE Delphi}
+{$ENDIF}
+
 interface
 
 uses
-  System.Classes, WinApi.Messages, MOS6502;
+{$IFnDEF FPC}
+  WinApi.Messages, System.Classes,
+{$ELSE}
+  Windows, Classes,
+{$ENDIF}
+  MOS6502;
 
 const
   WM_SCREEN_WRITE = WM_USER + 0;
@@ -11,23 +20,82 @@ const
   CIA1 = $9120;   // $DC00;
 
   // VIC-20 keyboard matrix
-  KEY_TRANSLATION = '2q'#0' '#27#0#0'1'+
-                    '4esz'#0'aw3'+
-                    '6tfcxdr5'+
-                    '8uhbvgy7'+
-                    '0okmnji9'+
-                    '-@:.,lp+'+
-                    #0#0'='#0'/;*£'+
-                    #0#0#0#0#0#0#13#8+
+{
+  Found at: https://www.lemon64.com/forum/viewtopic.php?t=68210
 
-                    '"'#0#0#0#0#0#0'!'+
-                    '$'#0#0#0#0#0#0'#'+
-                    '&'#0#0#0#0#0#0'%'+
-                    '('#0#0#0#0#0#0''''+
-                    '0'#0#0#0#0#0#0')'+
-                    '_'#0'[><l'#0#0+
-                    #0#0'='#0'?]'#0#0+
-                    #0#0#0#0#0#0#13#8;
+  VIC20 Keyboard Matrix
+
+  Write to Port B($9120)column
+  Read from Port A($9121)row
+
+       7   6   5   4   3   2   1   0
+      --------------------------------
+    7| F7  F5  F3  F1  CDN CRT RET DEL    CRT=Cursor-Right, CDN=Cursor-Down
+     |
+    6| HOM UA  =   RSH /   ;   *   BP     BP=British Pound, RSH=Should be Right-SHIFT,
+     |                                    UA=Up Arrow
+    5| -   @   :   .   ,   L   P   +
+     |
+    4| 0   O   K   M   N   J   I   9
+     |
+    3| 8   U   H   B   V   G   Y   7
+     |
+    2| 6   T   F   C   X   D   R   5
+     |
+    1| 4   E   S   Z   LSH A   W   3      LSH=Should be Left-SHIFT
+     |
+    0| 2   Q   CBM SPC STP CTL LA  1      LA=Left Arrow, CTL=Should be CTRL, STP=RUN/STOP
+     |                                    CBM=Commodore key
+
+  C64/VIC20 Keyboard Layout
+
+    LA  1  2  3  4  5  6  7  8  9  0  +  -  BP HOM DEL    F1
+    CTRL Q  W  E  R  T  Y  U  I  O  P  @  *  UA RESTORE   F3
+  STOP SL A  S  D  F  G  H  J  K  L  :  ;  =  RETURN      F5
+  C= SHIFT Z  X  C  V  B  N  M  ,  .  /  SHIFT  CDN CRT   F7
+           [        SPACE BAR       ]
+
+  Keyboard Connector
+  Pin  Desc.
+  1    Ground
+  2    [key]
+  3    RESTORE key
+  4    +5 volts
+  5    Column 7, Joy 3
+  6    Column 6
+  7    Column 5
+  8    Column 4
+  9    Column 3, Tape Write(E5)
+  10   Column 2
+  11   Column 1
+  12   Column 0
+  13   Row 7
+  14   Row 6
+  15   Row 5
+  16   Row 4
+  17   Row 3
+  18   Row 2
+  19   Row 1
+  20   Row 0
+}
+  KEY_TRANSLATION = '2'+'q'+#00+' '+#27+#00+#00+'1'+  // $00..$07  0
+                    '4'+'e'+'s'+'z'+#00+'a'+'w'+'3'+  // $08..$0f
+                    '6'+'t'+'f'+'c'+'x'+'d'+'r'+'5'+  // $10..$17
+                    '8'+'u'+'h'+'b'+'v'+'g'+'y'+'7'+  // $18..$1f
+                    '0'+'o'+'k'+'m'+'n'+'j'+'i'+'9'+  // $20..$27
+                    '-'+'@'+':'+'.'+','+'l'+'p'+'+'+  // $28..$2f
+
+                    #00+#00+'='+#00+'/'+';'+'*'+#00+  // $30..$37 // '£' is not working
+                    #00+#00+#00+#00+#00+#00+#13+#08+  // $38..$3f  63
+
+                    '"'+#00+#00+#00+#00+#00+#00+'!'+  // $40..$47  64
+                    '$'+#00+#00+#00+#00+#00+#00+'#'+  // $48..$4f
+                    '&'+#00+#00+#00+#00+#00+#00+'%'+  // $50..$57
+                    '('+#00+#00+#00+#00+#00+#00+''''+ // $58..$5f
+                    '0'+#00+#00+#00+#00+#00+#00+')'+  // $60..$67
+                    '_'+#00+'['+'>'+'<'+'l'+#00+#00+  // $68..$6f
+                    #00+#00+'='+#00+'?'+']'+#00+#00+  // $70..$77
+                    #00+#00+#00+#00+#00+#00+#13+#08;  // $78..$7f  127
 
 type
   TVC20 = class;
@@ -65,7 +133,12 @@ type
 implementation
 
 uses
-  System.SysUtils, Winapi.Windows, WinApi.MMSystem;
+{$IFnDEF FPC}
+  Winapi.Windows, System.SysUtils, WinApi.MMSystem;
+{$ELSE}
+  SysUtils, MMSystem;
+{$ENDIF}
+
 
 { TVC20 }
 
@@ -127,6 +200,7 @@ begin
     Timekillevent(TimerHandle);
   Thread.Terminate;
   Thread.WaitFor;
+  Thread.Free;
   FreeMem(Memory);
   inherited;
 end;
@@ -144,10 +218,16 @@ begin
   Result := 0;
   Cols := Memory[CIA1];
   for Col := 0 to 7 do
+  begin
     if Cols and (1 shl Col) = 0 then  // a 0 indicates a column read
+    begin
       for Row := 0 to 7 do
+      begin
         if KeyMatrix[7 - Col, Row] = 1 then
           Result := Result + (1 shl Row);
+      end;
+    end;
+  end;
   Result := not Result;
 end;
 

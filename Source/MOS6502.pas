@@ -27,6 +27,10 @@
 }
 unit MOS6502;
 
+{$IFDEF FPC}
+  {$MODE Delphi}
+{$ENDIF}
+
 interface
 
 type
@@ -889,7 +893,7 @@ begin
   if (Offset and $80) <> 0 then
     Offset := Offset or $FF00;
 
-  Addr := Pc + Offset;
+  {$R-}Addr := Pc + Offset;{$R+}
   Result := Addr;
 end;
 
@@ -1081,7 +1085,7 @@ var
 begin
   M := Read(Src);
   SET_CARRY((M and $80) <> 0);
-  M := M shl 1;
+  {$R-}M := M shl 1;{$R+}
   M := M and $FF;
   SET_NEGATIVE((M and $80) <> 0);
   SET_ZERO(M = 0);
@@ -1094,7 +1098,7 @@ var
 begin
   M := A;
   SET_CARRY((M and $80) <> 0);
-  M := M shl 1;
+  {$R-}M := M shl 1;{$R+}
   M := M and $FF;
   SET_NEGATIVE((M and $80) <> 0);
   SET_ZERO(M = 0);
@@ -1195,7 +1199,7 @@ procedure TMOS6502.Op_CMP(Src: Word);
 var
   Tmp: Cardinal;
 begin
-  Tmp := A - Read(Src);
+  {$R-}Tmp := A - Read(Src);{$R+}
   SET_CARRY(Tmp < $100);
   SET_NEGATIVE((Tmp and $80) <> 0);
   SET_ZERO((Tmp and $FF)=0);
@@ -1205,7 +1209,7 @@ procedure TMOS6502.Op_CPX(Src: Word);
 var
   Tmp: Cardinal;
 begin
-  Tmp := X - Read(Src);
+  {$R-}Tmp := X - Read(Src);{$R+}
   SET_CARRY(Tmp < $100);
   SET_NEGATIVE((Tmp and $80) <> 0);
   SET_ZERO((Tmp and $FF)=0);
@@ -1215,7 +1219,7 @@ procedure TMOS6502.Op_CPY(Src: Word);
 var
   Tmp: Cardinal;
 begin
-  Tmp := Y - Read(Src);
+  {$R-}Tmp := Y - Read(Src);{$R+}
   SET_CARRY(Tmp < $100);
   SET_NEGATIVE((Tmp and $80) <> 0);
   SET_ZERO((Tmp and $FF)=0);
@@ -1226,7 +1230,7 @@ var
   M: Byte;
 begin
   M := Read(Src);
-  M := M - 1;
+  {$R-}M := M - 1;{$R+}
   SET_NEGATIVE((M and $80) <> 0);
   SET_ZERO(M = 0);
   Write(Src, M);
@@ -1237,7 +1241,7 @@ var
   M: Byte;
 begin
   M := X;
-  M := M - 1;
+  {$R-}M := M - 1;{$R+}
   SET_NEGATIVE((M and $80) <> 0);
   SET_ZERO(M = 0);
   X := M;
@@ -1248,7 +1252,7 @@ var
   M: Byte;
 begin
   M := Y;
-  M := M - 1;
+  {$R-}M := M - 1;{$R+}
   SET_NEGATIVE((M and $80) <> 0);
   SET_ZERO(M = 0);
   Y := M;
@@ -1259,7 +1263,7 @@ var
   M: Byte;
 begin
   M := Read(Src);
-  M := A xor M;
+  {$R-}M := A xor M;{$R+}
   SET_NEGATIVE((M and $80) <> 0);
   SET_ZERO(M = 0);
   A := M;
@@ -1270,7 +1274,7 @@ var
   M: Byte;
 begin
   M := Read(Src);
-  M := M + 1;
+  {$R-}M := M + 1;{$R+}
   SET_NEGATIVE((M and $80) <> 0);
   SET_ZERO(M = 0);
   Write(Src, M);
@@ -1281,7 +1285,7 @@ var
   M: Byte;
 begin
   M := X;
-  M := M + 1;
+  {$R-}M := M + 1;{$R+}
   SET_NEGATIVE((M and $80) <> 0);
   SET_ZERO(M = 0);
   X := M;
@@ -1292,7 +1296,7 @@ var
   M: Byte;
 begin
   M := Y;
-  M := M + 1;
+  {$R-}M := M + 1;{$R+}
   SET_NEGATIVE((M and $80) <> 0);
   SET_ZERO(M = 0);
   Y := M;
@@ -1527,7 +1531,7 @@ var
   Tmp: Word;
 begin
   M := Read(Src);
-  Tmp := A - M - (1-IF_CARRY);
+  {$R-}Tmp := A - M - (1-IF_CARRY);{$R+}
 
   SET_NEGATIVE((Tmp and $80) <> 0);
 
