@@ -40,7 +40,7 @@ type
       NEGATIVE = $80;
       OVERFLOW = $40;
       CONSTANT = $20;
-      BREAK = $10;
+      BREAK_FLAG = $10;
       DECIMAL = $08;
       INTERRUPT = $04;
       ZERO = $02;
@@ -767,9 +767,9 @@ end;
 procedure TMOS6502.SET_BREAK(const Value: Boolean);
 begin
   if Value then
-    Status := Status or BREAK
+    Status := Status or BREAK_FLAG
   else
-    Status := Status and (not BREAK);
+    Status := Status and (not BREAK_FLAG);
 end;
 
 procedure TMOS6502.SET_DECIMAL(const Value: Boolean);
@@ -822,7 +822,7 @@ end;
 
 function TMOS6502.IF_BREAK: Boolean;
 begin
-  Result := ((Status and BREAK) <> 0);
+  Result := ((Status and BREAK_FLAG) <> 0);
 end;
 
 function TMOS6502.IF_DECIMAL: Boolean;
@@ -993,7 +993,7 @@ begin
   X := $00;
   Y := $00;
 
-  Status := BREAK or INTERRUPT OR ZERO or CONSTANT;
+  Status := BREAK_FLAG or INTERRUPT OR ZERO or CONSTANT;
   Sp := $FD;
 
   Pc := (Read(RSTVECTORH) shl 8) + Read(RSTVECTORL); // load PC from reset vector
@@ -1052,7 +1052,7 @@ var
 begin
   // fetch
   Opcode := Read(Pc);
-  Inc(Pc);
+  {$R-}Inc(Pc);{$R+}
 
   // decode and execute
   Instr := @InstrTable[Opcode];
@@ -1158,7 +1158,7 @@ begin
   Inc(Pc);
   StackPush((Pc shr 8) and $FF);
   StackPush(Pc and $FF);
-  StackPush(Status or BREAK);
+  StackPush(Status or BREAK_FLAG);
   SET_INTERRUPT(True);
   Pc := (Read(IRQVECTORH) shl 8) + Read(IRQVECTORL);
 end;
@@ -1392,7 +1392,7 @@ end;
 
 procedure TMOS6502.Op_PHP(Src: Word);
 begin
-  StackPush(Status or BREAK);
+  StackPush(Status or BREAK_FLAG);
 end;
 
 procedure TMOS6502.Op_PLA(Src: Word);

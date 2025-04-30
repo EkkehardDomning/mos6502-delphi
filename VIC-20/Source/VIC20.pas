@@ -109,23 +109,48 @@ type
     constructor Create(VC20Instance: TVC20);
   end;
 
+  TVC20MemKind = (mkUnimplemented,mkRAM,mkRegister,mkROM);
+  TV20MemRange = record
+    MemKind : TVC20MemKind;
+    MemStartAddr : Word;
+    MemStopAddr : Word;
+    MemDescr : String;
+  end;
+  TV20MemRangeArr = array of TV20MemRange;
+
+  { TVC20 }
+
   TVC20 = class(TMOS6502)
   private
     Thread: TVC20Thread;
     TimerHandle: Integer;
     LastKey: Char;
+    FMemoryMap : TV20MemRangeArr;
     procedure BusWrite(Adr: Word; Value: Byte);
     function BusRead(Adr: Word): Byte;
+    function GetMemoryMapKind(Index : Integer): TVC20MemKind;
     function KeyRead: Byte;
+    function GetMemKind(AMemAddr : Word) : TVC20MemKind;
+    procedure SetMemoryMapKind(Index : Integer; AValue: TVC20MemKind);
   protected
     KeyMatrix: Array[0 .. 7, 0 .. 7] of Byte;
     Memory: PByte;
     InterruptRequest: Boolean;
+    procedure SetupMemoryMap;virtual;
+    function GetMemoryMapItemCount : Integer;
+    function GetMemoryMapItems(Index : Integer) : TV20MemRange;
+    function GetMemoryMapKinds(Index : Integer) : TVC20MemKind;
+    procedure SetMemoryMapKinds(Index : Integer; Value : TVC20MemKind);
   public
     WndHandle: THandle;
+    property MemKind[AMemAddr : Word] : TVC20MemKind read GetMemKind;
+    property MemoryMapItemCount : Integer read GetMemoryMapItemCount;
+    property MemoryMapItems[Index : Integer] : TV20MemRange read GetMemoryMapItems;
+    property MemoryMapKinds[Index : Integer] : TVC20MemKind read GetMemoryMapKind write SetMemoryMapKind;
     constructor Create;
     destructor Destroy; override;
     procedure LoadROM(Filename: String; Addr: Word);
+    procedure Add3KRAMExt;
     procedure Exec;
     procedure SetKey(Key: Char; Value: Byte);
   end;
@@ -154,12 +179,26 @@ end;
 
 
 function TVC20.BusRead(Adr: Word): Byte;
+var
+  memk : TVC20MemKind;
 begin
   Result := Memory[Adr];
+  memk := MemKind[Adr];
+  if memk = mkUnimplemented then
+    Result := $FF;
+end;
+
+function TVC20.GetMemoryMapKind(Index : Integer): TVC20MemKind;
+begin
+
 end;
 
 procedure TVC20.BusWrite(Adr: Word; Value: Byte);
+var
+  memk : TVC20MemKind;
 begin
+  memk := MemKind[Adr];
+
   // test for I/O requests
   case Adr of
     CIA1:
@@ -174,7 +213,8 @@ begin
        TimerHandle := TimeSetEvent(34, 2, @TimerProcedure, DWORD(Self), TIME_PERIODIC);
   end;
 
-  if (Adr >= $2000) then // $A000  // treat anything above as ROM
+  if (memk = mkROM) or
+     (memk = mkUnimplemented) then
     Exit;
 
   Memory[Adr] := Value;
@@ -190,6 +230,8 @@ begin
 
   // create 64kB memory table
   GetMem(Memory, 65536);
+
+  SetupMemoryMap;
 
   Thread := TVC20Thread.Create(Self);
 end;
@@ -231,15 +273,161 @@ begin
   Result := not Result;
 end;
 
+function TVC20.GetMemKind(AMemAddr: Word): TVC20MemKind;
+var
+  i : Integer;
+begin
+  Result := mkUnimplemented;
+  for i := 0 to High(FMemoryMap) do
+  begin
+    if (AMemAddr >= FMemoryMap[i].MemStartAddr) and (AMemAddr <= FMemoryMap[i].MemStopAddr) then
+    begin
+      Result := FMemoryMap[i].MemKind;
+      Exit;
+    end;
+  end;
+end;
+
+procedure TVC20.SetMemoryMapKind(Index : Integer; AValue: TVC20MemKind);
+begin
+
+end;
+
+procedure TVC20.SetupMemoryMap;
+begin
+  SetLength(FMemoryMap,15);
+  // 0000-03FF 0-1023 Zero Page, 1K Ram
+  FMemoryMap[0].MemDescr:= 'ZERO - System Variables';
+  FMemoryMap[0].MemKind:= mkRAM;
+  FMemoryMap[0].MemStartAddr:= $0000;
+  FMemoryMap[0].MemStopAddr:=  $03FF;
+  // 0400-0FFF 1024-4095 Optional 3K Extension, 3K
+  FMemoryMap[1].MemDescr:= 'EXT2K - Expansion';
+  FMemoryMap[1].MemKind:= mkUnimplemented;
+  FMemoryMap[1].MemStartAddr:= $0400;
+  FMemoryMap[1].MemStopAddr:=  $0FFF;
+  // 1000-1DFF 4096-7679 Default User Basic memory, 3584 Bytes
+  FMemoryMap[2].MemDescr:= 'BASICUSR - Default Basic Mem';
+  FMemoryMap[2].MemKind:= mkRAM;
+  FMemoryMap[2].MemStartAddr:= $1000;
+  FMemoryMap[2].MemStopAddr:=  $1DFF;
+  // 1E00-1FFF 7680-8191 Default Screen Memory, 512 Bytes (used 22*23 = 506)
+  FMemoryMap[3].MemDescr:= 'SCREEN - Screen Mem';
+  FMemoryMap[3].MemKind:= mkRAM;
+  FMemoryMap[3].MemStartAddr:= $1E00;
+  FMemoryMap[3].MemStopAddr:=  $1FFF;
+  // 2000-3FFF 	8192-16383 BLK 1 – 8K expansion RAM/ROM block 1
+  FMemoryMap[4].MemDescr:= 'BLK1 - 8K Optional RAM/ROM';
+  FMemoryMap[4].MemKind:= mkUnimplemented;
+  FMemoryMap[4].MemStartAddr:= $2000;
+  FMemoryMap[4].MemStopAddr:=  $3FFF;
+  // 4000-5FFF 	16384-24575 BLK 2 – 8K expansion RAM/ROM block 2
+  FMemoryMap[5].MemDescr:= 'BLK2 - 8K Optional RAM/ROM';
+  FMemoryMap[5].MemKind:= mkUnimplemented;
+  FMemoryMap[5].MemStartAddr:= $4000;
+  FMemoryMap[5].MemStopAddr:=  $5FFF;
+  // 6000-7FFF 	24576-32767 BLK 3 – 8K expansion RAM/ROM block 3
+  FMemoryMap[6].MemDescr:= 'BLK3 - 8K Optional RAM/ROM';
+  FMemoryMap[6].MemKind:= mkUnimplemented;
+  FMemoryMap[6].MemStartAddr:= $6000;
+  FMemoryMap[6].MemStopAddr:=  $7FFF;
+  // 8000-8FFF 	32768-36863 4K Character generator ROM
+  FMemoryMap[7].MemDescr:= 'CHARACTER - 4K ROM';
+  FMemoryMap[7].MemKind:= mkUnimplemented;
+  FMemoryMap[7].MemStartAddr:= $8000;
+  FMemoryMap[7].MemStopAddr:=  $8FFF;
+  // 9000-93FF 	36864-37887 	I/O BLOCK 0 (VIC, VIA)
+  FMemoryMap[8].MemDescr:= 'IOBLK0 - VIC, VIA';
+  FMemoryMap[8].MemKind:= mkRegister;
+  FMemoryMap[8].MemStartAddr:= $8000;
+  FMemoryMap[8].MemStopAddr:=  $8FFF;
+  // 9400-97FF 	37888-38911 	I/O BLOCK 1 (COLOR Nibbles)
+  FMemoryMap[9].MemDescr:= 'IOBLK1 - Color Nibbles';
+  FMemoryMap[9].MemKind:= mkRAM;
+  FMemoryMap[9].MemStartAddr:= $8000;
+  FMemoryMap[9].MemStopAddr:=  $8FFF;
+  // 9800-9BFF 	38912-39935 	I/O BLOCK 2
+  FMemoryMap[10].MemDescr:= 'IOBLK2';
+  FMemoryMap[10].MemKind:= mkUnimplemented;
+  FMemoryMap[10].MemStartAddr:= $8000;
+  FMemoryMap[10].MemStopAddr:=  $8FFF;
+  // 9C00-9FFF 	39936-40959 	I/O BLOCK 3
+  FMemoryMap[11].MemDescr:= 'IOBLK3';
+  FMemoryMap[11].MemKind:= mkUnimplemented;
+  FMemoryMap[11].MemStartAddr:= $8000;
+  FMemoryMap[11].MemStopAddr:=  $8FFF;
+  // A000-BFFF 	40960-49152 	BLK 4 – ROM expansion (cartridges)
+  FMemoryMap[12].MemDescr:= 'BLK4 - 8K Optional ROM';
+  FMemoryMap[12].MemKind:= mkUnimplemented;
+  FMemoryMap[12].MemStartAddr:= $8000;
+  FMemoryMap[12].MemStopAddr:=  $8FFF;
+  // C000-DFFF 149152-57343 	BASIC – 8K ROM
+  FMemoryMap[13].MemDescr:= 'BASICSYS – 8K ROM';
+  FMemoryMap[13].MemKind:= mkUnimplemented; // Will be set to mkROM in the LoadROM method
+  FMemoryMap[13].MemStartAddr:= $C000;
+  FMemoryMap[13].MemStopAddr:=  $DFFF;
+  // E000-FFFF 157344-65535 	KERNAL – 8K ROM
+  FMemoryMap[14].MemDescr:= 'KERNAL – 8K ROM'; // Will be set to mkROM in the LoadROM method
+  FMemoryMap[14].MemKind:= mkUnimplemented;
+  FMemoryMap[14].MemStartAddr:= $E000;
+  FMemoryMap[14].MemStopAddr:=  $FFFF;
+end;
+
+function TVC20.GetMemoryMapItemCount: Integer;
+begin
+  Result := Length(FMemoryMap);
+end;
+
+function TVC20.GetMemoryMapItems(Index: Integer): TV20MemRange;
+begin
+  Result := FMemoryMap[Index];
+end;
+
+function TVC20.GetMemoryMapKinds(Index: Integer): TVC20MemKind;
+begin
+  Result := FMemoryMap[Index].MemKind;
+end;
+
+procedure TVC20.SetMemoryMapKinds(Index: Integer; Value: TVC20MemKind);
+begin
+  FMemoryMap[Index].MemKind := Value;
+end;
+
 procedure TVC20.LoadROM(Filename: String; Addr: Word);
 var
   Stream: TFileStream;
+  i : Integer;
+  addrstop : Word;
 begin
   Stream := TFileStream.Create(Filename, fmOpenRead);
   try
     Stream.Read(Memory[Addr], Stream.Size);
+    addrstop := Addr+Stream.Size-1;
+    for i := 0 to High(FMemoryMap) do
+    begin
+      if (FMemoryMap[i].MemStartAddr = Addr) and
+         (FMemoryMap[i].MemStopAddr = addrstop) then
+      begin
+        FMemoryMap[i].MemKind:= mkROM;
+        Break;
+      end;
+    end;
   finally
     Stream.Free;
+  end;
+end;
+
+procedure TVC20.Add3KRAMExt;
+var
+  i : Integer;
+begin
+  for i := 0 to High(FMemoryMap) do
+  begin
+    if (FMemoryMap[i].MemStartAddr = $0400)  then
+    begin
+      FMemoryMap[i].MemKind:= mkRAM;
+      Break;
+    end;
   end;
 end;
 
