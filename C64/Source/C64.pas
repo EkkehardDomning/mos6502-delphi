@@ -48,7 +48,7 @@ type
     function KeyRead: Byte;
   protected
     KeyMatrix: Array[0 .. 7, 0 .. 7] of Byte;
-    Memory: PByte;
+    Memory: array of Byte;
     InterruptRequest: Boolean;
   public
     WndHandle: THandle;
@@ -77,7 +77,7 @@ var
 begin
   C64 := TC64(dwUser);
 
-  if C64.Status and $04 = 0 then // if IRQ allowed then set irq
+  if C64.Status and INTERRUPT_FLAG = 0 then // if IRQ allowed then set irq
     C64.InterruptRequest := True;
 end;
 
@@ -118,7 +118,7 @@ begin
   inherited Create(BusRead, BusWrite);
 
   // create 64kB memory table
-  GetMem(Memory, 65536);
+  SetLength(Memory, 65536);
 
   Thread := TC64Thread.Create(Self);
 end;
@@ -130,7 +130,7 @@ begin
   Thread.Terminate;
   Thread.WaitFor;
   Thread.Free;
-  FreeMem(Memory);
+  SetLength(Memory,0);
   inherited;
 end;
 

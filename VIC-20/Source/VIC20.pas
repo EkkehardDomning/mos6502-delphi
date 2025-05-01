@@ -132,7 +132,7 @@ type
     function GetMemKind(AMemAddr : Word) : TVC20MemKind;
   protected
     KeyMatrix: Array[0 .. 7, 0 .. 7] of Byte;
-    Memory: PByte;
+    Memory: array of Byte;
     InterruptRequest: Boolean;
     procedure SetupMemoryMap;virtual;
     function GetMemoryMapItemCount : Integer;
@@ -171,7 +171,7 @@ var
 begin
   VC20 := TVC20(dwUser);
 
-  if VC20.Status and VC20.INTERRUPT_FLAG = 0 then // if IRQ allowed then set irq
+  if VC20.Status and INTERRUPT_FLAG = 0 then // if IRQ allowed then set irq
     VC20.InterruptRequest := True;
 end;
 
@@ -223,7 +223,7 @@ begin
   inherited Create(OnBusRead, OnBusWrite);
 
   // create 64kB memory table
-  GetMem(Memory, 65536);
+  SetLength(Memory, 65536);
 
   SetupMemoryMap;
 
@@ -237,7 +237,7 @@ begin
   Thread.Terminate;
   Thread.WaitFor;
   Thread.Free;
-  FreeMem(Memory);
+  SetLength(Memory,0);
   inherited;
 end;
 
@@ -255,7 +255,7 @@ begin
   Cols := Memory[CIA1];
   for Col := 0 to 7 do
   begin
-    if Cols and (1 shl Col) = 0 then  // FA 0 indicates FA column FBusRead
+    if Cols and (1 shl Col) = 0 then  // a 0 indicates a column read
     begin
       for Row := 0 to 7 do
       begin

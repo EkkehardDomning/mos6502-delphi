@@ -33,22 +33,23 @@ unit MOS6502;
 
 interface
 
+const
+  // Status bits
+  NEGATIVE_FLAG  = $80;
+  OVERFLOW_FLAG  = $40;
+  CONSTANT       = $20;
+  BREAK_CMD      = $10;
+  DECIMAL_FLAG   = $08;
+  INTERRUPT_FLAG = $04;
+  ZERO_FLAG      = $02;
+  CARRY_FLAG     = $01;
+
 type
 
   { TMOS6502 }
 
   TMOS6502 = class
     const
-      // Status bits
-      NEGATIVE_FLAG  = $80;
-      OVERFLOW_FLAG  = $40;
-      CONSTANT       = $20;
-      BREAK_CMD      = $10;
-      DECIMAL_FLAG   = $08;
-      INTERRUPT_FLAG = $04;
-      ZERO_FLAG      = $02;
-      CARRY_FLAG     = $01;
-
       // IRQ, reset, NMI vectors
       IRQVECTORH: Word = $FFFF;
       IRQVECTORL: Word = $FFFE;
@@ -77,7 +78,7 @@ type
     procedure SET_CONSTANT(const Value: Boolean); inline;
     procedure SET_BREAK(const Value: Boolean); inline;
     procedure SET_DECIMAL(const Value: Boolean); inline;
-    procedure SET_INTERRUPT(const Value: Boolean); inline;
+    procedure SET_INTERRUPT(const Value: Boolean);// inline;
     procedure SET_ZERO(const Value: Boolean); inline;
     procedure SET_CARRY(const Value: Boolean); inline;
     function IF_NEGATIVE: Boolean; inline;
@@ -187,7 +188,7 @@ type
 
   protected
     // consumed clock cycles
-    FCycles: Cardinal;
+    FCycles: UInt64;
 
     InstrTable: Array [0 .. 255] of TInstr;
 
@@ -252,7 +253,7 @@ type
     property ResetSP : Byte read FResetSP write FResetSP;
     property ResetStatus : Byte read FResetStatus write FResetStatus;
     property IllegalOpcode: Boolean read FIllegalOpcode write FIllegalOpcode;
-
+    property Cycles : UInt64 read FCycles;
   end;
 
 implementation
@@ -1820,7 +1821,7 @@ begin
 
   SET_ZERO((Tmp and $FF) = 0);
 
-   SET_OVERFLOW( (((FA xor Tmp) and $80) <> 0)  and (((FA xor M) and $80) <> 0));
+  SET_OVERFLOW( (((FA xor Tmp) and $80) <> 0)  and (((FA xor M) and $80) <> 0));
 
   if IF_DECIMAL then
   begin
