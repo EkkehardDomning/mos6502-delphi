@@ -1,10 +1,18 @@
 unit FormC64;
 
+{$IFDEF FPC}
+  {$MODE Delphi}
+{$ENDIF}
+
 interface
 
 uses
-  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
-  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, C64;
+{$IFnDEF FPC}
+  Vcl.Forms, Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics, Vcl.Controls, Vcl.Dialogs,
+{$ELSE}
+  Forms, Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Dialogs,
+{$ENDIF}
+  C64;
 
 const
   ScreenZoom = 2;
@@ -33,9 +41,15 @@ var
 
 implementation
 
-{$R *.dfm}
+{$IFnDEF FPC}
+  {$R *.dfm}
+{$ELSE}
+  {$R *.lfm}
+{$ENDIF}
 
 procedure TFrmC64.FormCreate(Sender: TObject);
+var
+  fp : String;
 begin
   ClientWidth := ScreenWidth;
   ClientHeight := ScreenHeight;
@@ -46,8 +60,13 @@ begin
 
   C64 := TC64.Create;
   C64.WndHandle := Handle;
-  C64.LoadROM('..\ROMs\basic.901226-01.bin', $A000);
-  C64.LoadROM('..\ROMs\kernal.901227-03.bin', $E000);
+  fp := IncludeTrailingPathDelimiter(ExtractFilePath(Application.ExeName));
+  {$IFDEF FPC}
+  fp := fp + '..\..\';
+  {$ENDIF}
+
+  C64.LoadROM(fp+'..\ROMs\basic.901226-01.bin', $A000);
+  C64.LoadROM(fp+'..\ROMs\kernal.901227-03.bin', $E000);
   C64.Exec;
 end;
 
@@ -77,6 +96,9 @@ var
   Flag: Cardinal;
   Q1: Byte;
   Sc: Char;
+  PxX, PxY, ChrWH : Integer;
+  sz : TSize;
+
 begin
   Addr := Msg.WParam;
   Value := Msg.LParam;
@@ -90,7 +112,16 @@ begin
 
   Canvas.Font.Color := ColorTable[1 - Flag];
   Canvas.Brush.Color := ColorTable[Flag];
-  Canvas.TextOut(X * (8*ScreenZoom), Y * (8*ScreenZoom), Sc);
+  Canvas.Pen.Style := psClear;
+  PxX := X * (8*ScreenZoom);
+  PxY := Y * (8*ScreenZoom);
+  ChrWH := 8*ScreenZoom;
+  Canvas.Rectangle(PxX,PxY,PxX+ChrWH+1,PxY+ChrWH+1);
+  if (Sc <> #0) and (Sc <> ' ') then
+  begin
+    sz := Canvas.TextExtent(Sc);
+    Canvas.TextOut(PxX+(ChrWH-sz.cx) div 2, PxY, Sc);
+  end;
 end;
 
 end.

@@ -126,12 +126,10 @@ type
     TimerHandle: Integer;
     LastKey: Char;
     FMemoryMap : TV20MemRangeArr;
-    procedure BusWrite(Adr: Word; Value: Byte);
-    function BusRead(Adr: Word): Byte;
-    function GetMemoryMapKind(Index : Integer): TVC20MemKind;
+    procedure OnBusWrite(Adr: Word; Value: Byte);
+    function OnBusRead(Adr: Word): Byte;
     function KeyRead: Byte;
     function GetMemKind(AMemAddr : Word) : TVC20MemKind;
-    procedure SetMemoryMapKind(Index : Integer; AValue: TVC20MemKind);
   protected
     KeyMatrix: Array[0 .. 7, 0 .. 7] of Byte;
     Memory: PByte;
@@ -146,7 +144,7 @@ type
     property MemKind[AMemAddr : Word] : TVC20MemKind read GetMemKind;
     property MemoryMapItemCount : Integer read GetMemoryMapItemCount;
     property MemoryMapItems[Index : Integer] : TV20MemRange read GetMemoryMapItems;
-    property MemoryMapKinds[Index : Integer] : TVC20MemKind read GetMemoryMapKind write SetMemoryMapKind;
+    property MemoryMapKinds[Index : Integer] : TVC20MemKind read GetMemoryMapKinds write SetMemoryMapKinds;
     constructor Create;
     destructor Destroy; override;
     procedure LoadROM(Filename: String; Addr: Word);
@@ -173,12 +171,12 @@ var
 begin
   VC20 := TVC20(dwUser);
 
-  if VC20.Status and VC20.INTERRUPT = 0 then // if IRQ allowed then set irq
+  if VC20.Status and VC20.INTERRUPT_FLAG = 0 then // if IRQ allowed then set irq
     VC20.InterruptRequest := True;
 end;
 
 
-function TVC20.BusRead(Adr: Word): Byte;
+function TVC20.OnBusRead(Adr: Word): Byte;
 var
   memk : TVC20MemKind;
 begin
@@ -187,13 +185,7 @@ begin
   if memk = mkUnimplemented then
     Result := $FF;
 end;
-
-function TVC20.GetMemoryMapKind(Index : Integer): TVC20MemKind;
-begin
-
-end;
-
-procedure TVC20.BusWrite(Adr: Word; Value: Byte);
+procedure TVC20.OnBusWrite(Adr: Word; Value: Byte);
 var
   memk : TVC20MemKind;
 begin
@@ -203,6 +195,8 @@ begin
   case Adr of
     CIA1:
       begin
+        memk := MemKind[Adr];
+
         // Handle keyboard reading
         Memory[Adr] := Value;
         Memory[CIA1 + 1] := KeyRead;
@@ -226,7 +220,7 @@ end;
 
 constructor TVC20.Create;
 begin
-  inherited Create(BusRead, BusWrite);
+  inherited Create(OnBusRead, OnBusWrite);
 
   // create 64kB memory table
   GetMem(Memory, 65536);
@@ -261,7 +255,7 @@ begin
   Cols := Memory[CIA1];
   for Col := 0 to 7 do
   begin
-    if Cols and (1 shl Col) = 0 then  // a 0 indicates a column read
+    if Cols and (1 shl Col) = 0 then  // FA 0 indicates FA column FBusRead
     begin
       for Row := 0 to 7 do
       begin
@@ -288,15 +282,10 @@ begin
   end;
 end;
 
-procedure TVC20.SetMemoryMapKind(Index : Integer; AValue: TVC20MemKind);
-begin
-
-end;
-
 procedure TVC20.SetupMemoryMap;
 begin
   SetLength(FMemoryMap,15);
-  // 0000-03FF 0-1023 Zero Page, 1K Ram
+  // 0000-03FF 0-1023 ZERO_FLAG Page, 1K Ram
   FMemoryMap[0].MemDescr:= 'ZERO - System Variables';
   FMemoryMap[0].MemKind:= mkRAM;
   FMemoryMap[0].MemStartAddr:= $0000;
@@ -339,28 +328,28 @@ begin
   // 9000-93FF 	36864-37887 	I/O BLOCK 0 (VIC, VIA)
   FMemoryMap[8].MemDescr:= 'IOBLK0 - VIC, VIA';
   FMemoryMap[8].MemKind:= mkRegister;
-  FMemoryMap[8].MemStartAddr:= $8000;
-  FMemoryMap[8].MemStopAddr:=  $8FFF;
+  FMemoryMap[8].MemStartAddr:= $9000;
+  FMemoryMap[8].MemStopAddr:=  $93FF;
   // 9400-97FF 	37888-38911 	I/O BLOCK 1 (COLOR Nibbles)
   FMemoryMap[9].MemDescr:= 'IOBLK1 - Color Nibbles';
   FMemoryMap[9].MemKind:= mkRAM;
-  FMemoryMap[9].MemStartAddr:= $8000;
-  FMemoryMap[9].MemStopAddr:=  $8FFF;
+  FMemoryMap[9].MemStartAddr:= $9400;
+  FMemoryMap[9].MemStopAddr:=  $97FF;
   // 9800-9BFF 	38912-39935 	I/O BLOCK 2
   FMemoryMap[10].MemDescr:= 'IOBLK2';
   FMemoryMap[10].MemKind:= mkUnimplemented;
-  FMemoryMap[10].MemStartAddr:= $8000;
-  FMemoryMap[10].MemStopAddr:=  $8FFF;
+  FMemoryMap[10].MemStartAddr:= $9800;
+  FMemoryMap[10].MemStopAddr:=  $9BFF;
   // 9C00-9FFF 	39936-40959 	I/O BLOCK 3
   FMemoryMap[11].MemDescr:= 'IOBLK3';
   FMemoryMap[11].MemKind:= mkUnimplemented;
-  FMemoryMap[11].MemStartAddr:= $8000;
-  FMemoryMap[11].MemStopAddr:=  $8FFF;
+  FMemoryMap[11].MemStartAddr:= $9C00;
+  FMemoryMap[11].MemStopAddr:=  $9FFF;
   // A000-BFFF 	40960-49152 	BLK 4 – ROM expansion (cartridges)
   FMemoryMap[12].MemDescr:= 'BLK4 - 8K Optional ROM';
   FMemoryMap[12].MemKind:= mkUnimplemented;
-  FMemoryMap[12].MemStartAddr:= $8000;
-  FMemoryMap[12].MemStopAddr:=  $8FFF;
+  FMemoryMap[12].MemStartAddr:= $A000;
+  FMemoryMap[12].MemStopAddr:=  $BFFF;
   // C000-DFFF 149152-57343 	BASIC – 8K ROM
   FMemoryMap[13].MemDescr:= 'BASICSYS – 8K ROM';
   FMemoryMap[13].MemKind:= mkUnimplemented; // Will be set to mkROM in the LoadROM method
