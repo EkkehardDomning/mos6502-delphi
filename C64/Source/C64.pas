@@ -1,15 +1,28 @@
-unit C64;
+﻿unit C64;
+
+{$IFDEF FPC}
+  {$MODE Delphi}
+{$ENDIF}
 
 interface
 
 uses
-  System.Classes, WinApi.Messages, MOS6502;
+{$IFnDEF FPC}
+  WinApi.Messages, System.Classes,
+{$ELSE}
+  Messages, Classes,
+{$ENDIF}
+  MOS6502;
 
 const
   WM_SCREEN_WRITE = WM_USER + 0;
 
   CIA1 = $DC00;
-  KEY_TRANSLATION = '1�+9753'#8+#8'*piyrw'#13+#0';ljgda'#0+'2'#0'-0864'#0+' '#0'.mbcz'#0+#0'=:khfs'#0+'q'#0'@oute'#0+
+{  KEY_TRANSLATION = '1£+9753'#8+#8'*piyrw'#13+#0';ljgda'#0+'2'#0'-0864'#0+' '#0'.mbcz'#0+#0'=:khfs'#0+'q'#0'@oute'#0+
+    #0'/,nvx'#0#0+'!'#0#0')'#39'%#'+#0+#0#0#0#0#0#0#0#13+#0']'#0#0#0#0#0#0+'"'#0#0#0'(&$'#0+' '#0'>'#0#0#0#0#0+
+    #0#0'['#0#0#0#0#0+#0#0#0#0#0#0#0#0+#0'?<';
+}
+   KEY_TRANSLATION = '1'#0'+9753'#8+#8'*piyrw'#13+#0';ljgda'#0+'2'#0'-0864'#0+' '#0'.mbcz'#0+#0'=:khfs'#0+'q'#0'@oute'#0+
     #0'/,nvx'#0#0+'!'#0#0')'#39'%#'+#0+#0#0#0#0#0#0#0#13+#0']'#0#0#0#0#0#0+'"'#0#0#0'(&$'#0+' '#0'>'#0#0#0#0#0+
     #0#0'['#0#0#0#0#0+#0#0#0#0#0#0#0#0+#0'?<';
 
@@ -35,7 +48,7 @@ type
     function KeyRead: Byte;
   protected
     KeyMatrix: Array[0 .. 7, 0 .. 7] of Byte;
-    Memory: PByte;
+    Memory: array of Byte;
     InterruptRequest: Boolean;
   public
     WndHandle: THandle;
@@ -49,7 +62,12 @@ type
 implementation
 
 uses
-  System.SysUtils, Winapi.Windows, WinApi.MMSystem;
+{$IFnDEF FPC}
+  Winapi.Windows, System.SysUtils, WinApi.MMSystem;
+{$ELSE}
+  Windows, SysUtils, MMSystem;
+{$ENDIF}
+
 
 { TC64 }
 
@@ -59,7 +77,7 @@ var
 begin
   C64 := TC64(dwUser);
 
-  if C64.Status and $04 = 0 then // if IRQ allowed then set irq
+  if C64.Status and INTERRUPT_FLAG = 0 then // if IRQ allowed then set irq
     C64.InterruptRequest := True;
 end;
 
@@ -100,7 +118,7 @@ begin
   inherited Create(BusRead, BusWrite);
 
   // create 64kB memory table
-  GetMem(Memory, 65536);
+  SetLength(Memory, 65536);
 
   Thread := TC64Thread.Create(Self);
 end;
@@ -111,7 +129,8 @@ begin
     Timekillevent(TimerHandle);
   Thread.Terminate;
   Thread.WaitFor;
-  FreeMem(Memory);
+  Thread.Free;
+  SetLength(Memory,0);
   inherited;
 end;
 

@@ -1,11 +1,19 @@
 program TestSuite;
 
+{$IFDEF FPC}
+  {$MODE Delphi}
+{$ENDIF}
+
 {$APPTYPE CONSOLE}
 
-{$R *.res}
+{.$R *.res}
 
 uses
+{$IFnDEF FPC}
   System.Classes, System.SysUtils,
+{$ELSE}
+  Classes, SysUtils,
+{$ENDIF}
   MOS6502 in '..\..\Source\MOS6502.pas';
 
 type
@@ -86,13 +94,18 @@ end;
 
 var
   MOS6502: TMOS6502TestSuite;
-
+  fp : String;
 begin
   try
     MOS6502 := TMOS6502TestSuite.Create;
     try
       // load test bin
-      MOS6502.Load('..\Test-Files\6502_functional_test.bin');
+      fp := '..\Test-Files\';
+      {$IFDEF FPC}
+        fp :=  '..\..\'+ fp;
+      {$ENDIF}
+
+      MOS6502.Load(fp+'6502_functional_test.bin');
 
       // set reset vectors to $0400
       MOS6502.Memory[$FFFC] := 0;

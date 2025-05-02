@@ -63,6 +63,8 @@ begin
 
   VC20 := TVC20.Create;
   VC20.WndHandle := Handle;
+  // Call for 3K RAM extension installed, comment if default ram should be used
+  VC20.Add3KRAMExt;
   fp := IncludeTrailingPathDelimiter(ExtractFilePath(Application.ExeName));
   {$IFDEF FPC}
   fp := fp + '..\..\';
